@@ -11,6 +11,7 @@ import "C"
 import (
 	"fmt"
 	"unsafe"
+	idx "victorgo/index"
 )
 
 // ErrorCode maps C error codes to Go
@@ -26,12 +27,15 @@ const (
 	INVALID_ARGUMENT
 	INVALID_ID
 	INVALID_REF
+	INVALID_METHOD
 	DUPLICATED_ENTRY
 	NOT_FOUND_ID
 	INDEX_EMPTY
 	THREAD_ERROR
 	SYSTEM_ERROR
+	FILEIO_ERROR
 	NOT_IMPLEMENTED
+	INVALID_FILE
 )
 
 // errorMessages maps error codes to human-readable messages
@@ -69,20 +73,22 @@ func toError(code C.int) error {
 	return fmt.Errorf("unknown error code: %d", code)
 }
 
-// MatchResult represents a search result in Go
-type MatchResult struct {
-	ID       int     `json:"id"`
-	Distance float32 `json:"distance"`
-}
-
 // Index represents an index structure in Go
 type Index struct {
 	ptr *C.Index
 }
 
 // AllocIndex creates a new index
-func AllocIndex(indexType, method int, dims uint16) (*Index, error) {
-	idx := C.alloc_index(C.int(indexType), C.int(method), C.uint16_t(dims), nil)
+func AllocIndex(indexType, method int, dims uint16, icontext idx.IndexContext) (*Index, error) {
+	var ptrCtx unsafe.Pointer
+	if icontext != nil {
+		ptrCtx = icontext.CreateContext()
+		defer func() {
+			icontext.ReleaseContext(ptrCtx)
+		}()
+	}
+
+	idx := C.alloc_index(C.int(indexType), C.int(method), C.uint16_t(dims), ptrCtx)
 	if idx == nil {
 		return nil, fmt.Errorf("failed to allocate index")
 	}

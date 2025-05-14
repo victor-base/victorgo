@@ -50,6 +50,18 @@ typedef struct {
 #define COSINE 0x01  // Cosine Similarity
 #define DOTP   0x02  // Dot Product
 
+#include <stdio.h>
+
+#define PRINT_VECTOR(where,vec, dims)                              \
+    do {                                                     \
+        printf("%s [", (where));                                         \
+        for (int _i = 0; _i < (dims); ++_i) {                \
+            printf("%s%.4f", (_i == 0 ? "" : ", "), (vec)[_i]); \
+        }                                                    \
+        printf("]\n");                                       \
+    } while (0)
+
+
 /**
  * Enumeration of error codes returned by index operations.
  */
@@ -63,6 +75,7 @@ typedef enum {
     INVALID_ARGUMENT,
     INVALID_ID,
     INVALID_REF,
+    INVALID_METHOD,
     DUPLICATED_ENTRY,
     NOT_FOUND_ID,
     INDEX_EMPTY,
@@ -74,10 +87,21 @@ typedef enum {
 } ErrorCode;
 
 /**
+ * victor_strerror - Returns a human-readable error message for an ErrorCode.
+ *
+ * This function maps each error code to a descriptive string suitable
+ * for logs, stderr, or user-facing error messages.
+ *
+ * @param code  The ErrorCode value.
+ *
+ * @return A constant string with the error description.
+ */
+extern const char *victor_strerror(ErrorCode code);
+
+/**
  * Constants for index types.
  */
 #define FLAT_INDEX    0x00  // Sequential flat index (single-threaded)
-#define FLAT_INDEX_MP 0x01  // Flat index with multi-threaded support
 #define NSW_INDEX     0x02  // Navigable Small World graph
 #define HNSW_INDEX    0x03  // Hierarchical NSW (planned)
 
@@ -97,7 +121,11 @@ typedef struct {
  */
 typedef struct {
     TimeStat insert;     // Insert operations timing
+#ifdef __cplusplus
+    TimeStat remove;
+#else
     TimeStat delete;     // Delete operations timing
+#endif
     TimeStat dump;       // Dump to file operation
     TimeStat search;     // Single search timing
     TimeStat search_n;   // Multi-search timing
@@ -113,6 +141,16 @@ typedef struct {
     int ef_construct;
     int odegree;
 } NSWContext;
+
+#define HNSW_CONTEXT 0x01
+#define HNSW_CONTEXT_SET_EF_CONSTRUCT 1 << 2
+#define HNSW_CONTEXT_SET_EF_SEARCH    1 << 3
+#define HNSW_CONTEXT_SET_M0           1 << 4
+typedef struct {
+    int ef_search;
+    int ef_construct;
+    int M0;
+} HNSWContext;
 
 #ifndef _LIB_CODE
 
@@ -150,12 +188,17 @@ extern int insert(Index *index, uint64_t id, float32_t *vector, uint16_t dims);
  * Deletes a vector from the index by ID.
  * Wrapper for Index->delete.
  */
+#ifdef __cplusplus
+extern int cpp_delete(Index *index, uint64_t id); 
+#else
 extern int delete(Index *index, uint64_t id);
+#endif
+
 
 /**
  * Update Index Context 
  */
-extern int update_icontext(Index *index, void *icontext);
+extern int update_icontext(Index *index, void *icontext, int mode);
 
 /**
  * Retrieves the internal statistics of the index.
@@ -223,7 +266,10 @@ extern int contains(Index *index, uint64_t id);
  */
 extern Index *alloc_index(int type, int method, uint16_t dims, void *icontext);
 
-
+/**
+ * Return index name
+ */
+extern const char* index_name(Index *index);
 /**
  * Loads an index from a previously dumped file.
  *
@@ -242,6 +288,50 @@ extern Index *load_index(const char *filename);
  */
 extern int destroy_index(Index **index);
 #endif
+
+/*
+ * Asynchronous Top-K Sort (ASort) implementation using a best-heap.
+ */
+typedef struct ASort ASort;
+
+/**
+ * @brief Initializes an ASort context.
+ *
+ * Allocates and initializes the internal heap used to store top-k matches.
+ *
+ * @param[in,out] as Pointer to the ASort context to initialize.
+ * @param[in] n Maximum number of elements to maintain in the heap.
+ * @param[in] method Matching method identifier for comparison.
+ * @return SUCCESS on success, or an error code on failure.
+ */
+extern int init_asort(ASort *as, int n, int method);
+
+/**
+ * @brief Adds multiple match results into the ASort structure.
+ *
+ * Inserts match results into the heap, keeping only the best k elements.
+ * If the heap is full, it replaces the worst element if a better match is found.
+ *
+ * @param[in,out] as Pointer to the ASort context.
+ * @param[in] inputs Array of match results to insert.
+ * @param[in] n Number of match results in the input array.
+ * @return SUCCESS on success, or an error code on failure.
+ */
+extern int as_update(ASort *as, MatchResult *inputs, int n);
+
+/**
+ * @brief Finalizes the ASort context and extracts sorted results.
+ *
+ * Pops elements from the internal heap into the output array in approximate order.
+ * If the output array is NULL, simply releases internal resources.
+ *
+ * @param[in,out] as Pointer to the ASort context.
+ * @param[out] outputs Array to store the extracted match results, or NULL to just free resources.
+ * @param[in] n Maximum number of results to extract.
+ * @return Number of results extracted on success, 0 if only freed, or an error code on failure.
+ */
+extern int as_close(ASort *as, MatchResult *outputs, int n);
+
 
 #endif //* __VICTOR_H */
 

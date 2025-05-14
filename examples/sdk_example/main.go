@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"victorgo/index"
 	"victorgo/victor"
 )
 
@@ -59,7 +60,8 @@ func main() {
 
 	// Create a new index
 	fmt.Println("Creating index...")
-	idx, err := victor.AllocIndex(IndexType, Method, Dims)
+	idxExample := index.HNSWIndex{EfSearch: 10, EfConstruct: 15, M0: 3}
+	idx, err := victor.AllocIndex(IndexType, Method, Dims, &idxExample)
 	if err != nil {
 		panic(err)
 	}
