@@ -68,7 +68,7 @@ func toError(code C.int) error {
 		return nil
 	}
 	if msg, exists := errorMessages[ErrorCode(code)]; exists {
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 	return fmt.Errorf("unknown error code: %d", code)
 }
@@ -155,7 +155,7 @@ func (idx *Index) SearchN(vector []float32, n int) ([]MatchResult, error) {
 
 	// Convert C results to Go results
 	results := make([]MatchResult, n)
-	for i := 0; i < n; i++ {
+	for i := range results {
 		results[i] = MatchResult{
 			ID:       int(cResults[i].id),
 			Distance: float32(cResults[i].distance),
@@ -205,6 +205,23 @@ func (idx *Index) Contains(id uint64) (bool, error) {
 	result := C.contains(idx.ptr, C.uint64_t(id))
 
 	return result == 1, nil
+}
+
+func (idx *Index) FilterSubset(ids []uint32, vector []float32, n int) error {
+	if idx.ptr == nil {
+		return ErrIndexNotInitialized
+	}
+
+	if len(vector) == 0 {
+		return ErrEmptyVector
+	}
+
+	var cResult C.MatchResult
+	cIds := (*C.int)(unsafe.Pointer(&vector[0]))
+	cVector := (*C.float)(unsafe.Pointer(&vector[0]))
+	err := C.filter_subset(idx.ptr, cIds, C.int(len(ids)), cVector, C.int(len(vector)), cResult, C.int(n))
+
+	return toError(err)
 }
 
 // GetStats retrieves the internal statistics of the index
