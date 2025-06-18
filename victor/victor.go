@@ -207,21 +207,35 @@ func (idx *Index) Contains(id uint64) (bool, error) {
 	return result == 1, nil
 }
 
-func (idx *Index) FilterSubset(ids []uint32, vector []float32, n int) error {
+func (idx *Index) FilterSubset(ids []uint32, vector []float32, n int) ([]MatchResult, error) {
 	if idx.ptr == nil {
-		return ErrIndexNotInitialized
+		return nil, ErrIndexNotInitialized
 	}
 
 	if len(vector) == 0 {
-		return ErrEmptyVector
+		return nil, ErrEmptyVector
 	}
 
-	var cResult C.MatchResult
-	cIds := (*C.int)(unsafe.Pointer(&vector[0]))
+	cResults := make([]C.MatchResult, n)
+	cIds := (*C.uint64_t)(unsafe.Pointer(&vector[0]))
 	cVector := (*C.float)(unsafe.Pointer(&vector[0]))
-	err := C.filter_subset(idx.ptr, cIds, C.int(len(ids)), cVector, C.int(len(vector)), cResult, C.int(n))
+	
+	err := C.filter_subset(idx.ptr, cIds, C.int(len(ids)), cVector, C.uint16_t(len(vector)), (*C.MatchResult)(unsafe.Pointer(&cResults[0])), C.int(n))
 
-	return toError(err)
+	if e := toError(err); e != nil {
+		return nil, e
+	}
+
+	// Convert C results to Go results
+	results := make([]MatchResult, n)
+	for i := range results {
+		results[i] = MatchResult{
+			ID:       int(cResults[i].id),
+			Distance: float32(cResults[i].distance),
+		}
+	}
+
+	return results, nil
 }
 
 // GetStats retrieves the internal statistics of the index
