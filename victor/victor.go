@@ -207,7 +207,7 @@ func (idx *Index) Contains(id uint64) (bool, error) {
 	return result == 1, nil
 }
 
-func (idx *Index) FilterSubset(ids []uint32, vector []float32, n int) ([]MatchResult, error) {
+func (idx *Index) FilterSubset(ids []uint64, vector []float32, n int) ([]MatchResult, error) {
 	if idx.ptr == nil {
 		return nil, ErrIndexNotInitialized
 	}
@@ -216,22 +216,22 @@ func (idx *Index) FilterSubset(ids []uint32, vector []float32, n int) ([]MatchRe
 		return nil, ErrEmptyVector
 	}
 
-	cResults := make([]C.MatchResult, n)
-	cIds := (*C.uint64_t)(unsafe.Pointer(&vector[0]))
+	cMatchResults := make([]C.MatchResult, n)
+	CResults :=  (*C.MatchResult)(unsafe.Pointer(&cMatchResults[0]))
+	cIds := (*C.uint64_t)(unsafe.Pointer(&ids[0]))
 	cVector := (*C.float)(unsafe.Pointer(&vector[0]))
 	
-	err := C.filter_subset(idx.ptr, cIds, C.int(len(ids)), cVector, C.uint16_t(len(vector)), (*C.MatchResult)(unsafe.Pointer(&cResults[0])), C.int(n))
+	err := C.filter_subset(idx.ptr, cIds, C.int(len(ids)), cVector, C.uint16_t(len(vector)), CResults, C.int(n))
 
 	if e := toError(err); e != nil {
 		return nil, e
 	}
 
-	// Convert C results to Go results
 	results := make([]MatchResult, n)
 	for i := range results {
 		results[i] = MatchResult{
-			ID:       int(cResults[i].id),
-			Distance: float32(cResults[i].distance),
+			ID:       int(cMatchResults[i].id),
+			Distance: float32(cMatchResults[i].distance),
 		}
 	}
 
