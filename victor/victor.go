@@ -238,6 +238,10 @@ func (idx *Index) FilterSubset(ids []uint64, vector []float32, n int) ([]MatchRe
 	return results, nil
 }
 
+func (idx *Index) KMeansCentroids(n int)(){
+	
+} 
+
 // GetStats retrieves the internal statistics of the index
 func (idx *Index) GetStats() (*IndexStats, error) {
 	if idx.ptr == nil {

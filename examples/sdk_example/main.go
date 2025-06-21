@@ -70,9 +70,9 @@ func main() {
 	// Insert random vectors
 	fmt.Printf("Inserting %d random vectors...\n", NumVectors)
 	vectors := make([][]float32, NumVectors)
-	for i := 0; i < NumVectors; i++ {
+	for i := range vectors {
 		vectors[i] = generateRandomVector(Dims)
-		err = idx.Insert(uint64(i+1), vectors[i])
+		err := idx.Insert(uint64(i+1), vectors[i])
 		if err != nil {
 			panic(err)
 		}
